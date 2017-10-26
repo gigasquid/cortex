@@ -98,7 +98,8 @@ a datastructure that shares the backing store."
         (condp = act-type
           :logistic (tensor/unary-op! output 1.0 input :logistic)
           :tanh (tensor/unary-op! output 1.0 input :tanh)
-          :relu (tensor/binary-op! output 1.0 input 0 0 :max)))))
+          :relu (tensor/binary-op! output 1.0 input 0 0 :max)
+          :swish (tensor/unary-op! output 1.0 input :swish)))))
 
   (backward [this parameter-buffers output-buffers input-buffers]
     (tensor/with-stream (nn-backend/get-stream)
@@ -113,6 +114,9 @@ a datastructure that shares the backing store."
   [backend node batch-size]
   (->ActivationLayer :relu node))
 
+(defmethod create :swish
+  [backend node batch-size]
+  (->ActivationLayer :swish node))
 
 (defmethod create :logistic
   [backend node batch-size]

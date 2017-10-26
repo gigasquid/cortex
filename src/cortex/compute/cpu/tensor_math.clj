@@ -179,6 +179,8 @@
     :tanh `(Math/tanh (double ~x))
     :logistic `(/ 1.0
                   (+ 1.0 (Math/exp (- ~x))))
+    :swish `(* ~x (/ 1.0
+                     (+ 1.0 (Math/exp (- ~x)))))
     :exp `(Math/exp (double ~x))
     :sqrt `(Math/sqrt (double ~x))
     :noop `(double ~x)))
@@ -1244,6 +1246,11 @@
 
 (def cpu-nn-ops (cpu-nn-ops-macro))
 
+;;; for swish calcs
+(defmacro sigma [one v] `(/ ~one
+                           (+ ~one (Math/exp (- ~v)))))
+(defmacro fx [one v] `(* ~v (sigma ~one ~v)))
+
 
 (defmacro act-backward-impl
   [datatype]
@@ -1271,6 +1278,16 @@
             (v-aset src-grad# (.idx_to_address src-grad-idx# idx#)
                     (* out-val#
                        (- val-1# out-val#)
+                       (v-aget dest-grad# (.idx_to_address dest-grad-idx# idx#))))))
+         :swish
+         ;; ( f(x) + (sigma(x) * (1 - f(x)))) * output-grad
+         (parallel/parallel-for
+          idx# n-elems#
+          (let [out-val# (v-aget dest# (.idx_to_address dest-idx# idx#))]
+            (v-aset src-grad# (.idx_to_address src-grad-idx# idx#)
+                    (* (+ (fx val-1# out-val#)
+                          (* (sigma val-1# out-val#)
+                             (- val-1# (fx val-1# out-val#))))
                        (v-aget dest-grad# (.idx_to_address dest-grad-idx# idx#))))))
          :relu
          (parallel/parallel-for
