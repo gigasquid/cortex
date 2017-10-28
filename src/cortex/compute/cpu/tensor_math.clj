@@ -1246,10 +1246,14 @@
 
 (def cpu-nn-ops (cpu-nn-ops-macro))
 
-;;; for swish calcs
-(defmacro sigma [one v] `(/ ~one
+;;; For swish calcs
+;; Swish = x*sigm(x)
+;; deriv = fx + sigm(x)(1 - fx) where fx = x * sigm(x)
+(defmacro sigm [one v] `(/ ~one
                            (+ ~one (Math/exp (- ~v)))))
-(defmacro fx [one v] `(* ~v (sigma ~one ~v)))
+(defmacro fx [one v] `(* ~v (sigm ~one ~v)))
+(defmacro swish-deriv [one v] `(+  (fx ~one ~v)
+                                   (* (sigm ~one  ~v) (- ~one (fx ~one ~v)))))
 
 
 (defmacro act-backward-impl
@@ -1285,9 +1289,7 @@
           idx# n-elems#
           (let [out-val# (v-aget dest# (.idx_to_address dest-idx# idx#))]
             (v-aset src-grad# (.idx_to_address src-grad-idx# idx#)
-                    (* (+ (fx val-1# out-val#)
-                          (* (sigma val-1# out-val#)
-                             (- val-1# (fx val-1# out-val#))))
+                    (* (swish-deriv val-1# out-val#)
                        (v-aget dest-grad# (.idx_to_address dest-grad-idx# idx#))))))
          :relu
          (parallel/parallel-for
