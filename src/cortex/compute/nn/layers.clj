@@ -99,7 +99,8 @@ a datastructure that shares the backing store."
           :logistic (tensor/unary-op! output 1.0 input :logistic)
           :tanh (tensor/unary-op! output 1.0 input :tanh)
           :relu (tensor/binary-op! output 1.0 input 0 0 :max)
-          :swish (tensor/unary-op! output 1.0 input :swish)))))
+          :swish (do (tensor/unary-op! output 1.0 input :logistic)
+                     (tensor/binary-op! output 1.0 input 1.0 output :*))))))
 
   (backward [this parameter-buffers output-buffers input-buffers]
     (tensor/with-stream (nn-backend/get-stream)
@@ -107,7 +108,25 @@ a datastructure that shares the backing store."
             output (->tensor (first-buffer output-buffers))
             input-gradient (->tensor (first-gradient input-buffers))
             output-gradient (->tensor (first-gradient output-buffers))]
-        (tensor/activation-gradient! input-gradient output-gradient output act-type)))))
+        (condp = act-type
+          :logistic (tensor/activation-gradient! input-gradient output-gradient output act-type)
+          :tanh (tensor/activation-gradient! input-gradient output-gradient output act-type)
+          :relu (tensor/activation-gradient! input-gradient output-gradient output act-type)
+          :swish (do  ;; (fx + sigm *(1 -fx)) * output-grad
+                   (let [fx (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+                         sigm (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
+                     (tensor/unary-op! fx 1.0 output :logistic)
+                     (tensor/binary-op! fx 1.0 fx 1.0 output :*)
+
+                     (tensor/unary-op! sigm 1.0 output :logistic)
+
+                     (tensor/binary-op! input-gradient 1.0 1.0 1.0 fx :-)
+                     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 sigm :*)
+                     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 fx :+)
+
+                     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
+                     input-gradient))
+          )))))
 
 
 (defmethod create :relu

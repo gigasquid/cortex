@@ -295,8 +295,8 @@
                                1
                                (flatten (repeat (/ item-count 2) [-1 1]))
                                (flatten (repeat (/ item-count 2) [-1 1])))]
-    (println "Carin output is " (mapv str  output))
-    (println "Carin input-gradient is input-gradient" (map str input-gradient))
+    (println "Carin output " (mapv str output))
+    (println "Carin input-gradient " (mapv str input-gradient))
     (is (utils/about-there? output (first (activation-answers act-type))))
     (is (utils/about-there? input-gradient (second (activation-answers act-type))))))
 

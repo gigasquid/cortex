@@ -435,6 +435,7 @@ will determine the shape of the outgoing tensor."
     (construct-tensor device dimensions dev-buffer)))
 
 
+
 (defn new-tensor
   [shape & {:keys [datatype init-value]
                    :or {datatype *datatype*
@@ -606,7 +607,7 @@ and the rest of the dimensions being squashed into n-rows."
 
 (def unary-operations
   [:floor :ceil :round :- :tanh :logistic
-   :exp :sqrt :noop :swish])
+   :exp :sqrt :noop])
 
 
 (defn- perform-unary-op
@@ -619,8 +620,6 @@ and the rest of the dimensions being squashed into n-rows."
     :tanh (Math/tanh value)
     :logistic (/ 1.0
                  (+ 1.0 (Math/exp (- value))))
-    :swish (* value (/ 1.0
-                       (+ 1.0 (Math/exp (- value)))))
     :exp (Math/exp value)
     :sqrt (Math/sqrt value)
     :noop value))
