@@ -1259,7 +1259,6 @@ See batch-normalize-update-and-apply!"
   "Generalized function to get the input gradient from a set of 'activation' functions:
   :logistic, :tanh :relu (max 0 x)
   logistic: out * (1 - out) * out-grad
-  swish:( f(x) + (sigmoid(x) * (1 - f(x)))) * grad (where f(x) = x * sigmoid(x))
   tanh: (1 - out * out) * out-grad
   relu: (out > 0) ? out-grad : 0"
   ^Tensor [input-gradient output-gradient output op]
@@ -1267,7 +1266,7 @@ See batch-normalize-update-and-apply!"
   (ensure-same-device input-gradient output output-gradient)
   (ensure-cudnn-datatype (get-datatype input-gradient) "activation-gradient!")
   (ensure-external-library-compatible input-gradient output-gradient output)
-  (when-not-error (contains? #{:logistic :tanh :relu :swish} op)
+  (when-not-error (contains? #{:logistic :tanh :relu} op)
     "Only :logistic :tanh and :relu and swish are supported"
     {:operation op})
   (let [out-ecount (ecount output)]

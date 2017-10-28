@@ -179,8 +179,6 @@
     :tanh `(Math/tanh (double ~x))
     :logistic `(/ 1.0
                   (+ 1.0 (Math/exp (- ~x))))
-    :swish `(* ~x (/ 1.0
-                     (+ 1.0 (Math/exp (- ~x)))))
     :exp `(Math/exp (double ~x))
     :sqrt `(Math/sqrt (double ~x))
     :noop `(double ~x)))
@@ -1246,16 +1244,6 @@
 
 (def cpu-nn-ops (cpu-nn-ops-macro))
 
-;;; For swish calcs
-;; Swish = x*sigm(x)
-;; deriv = fx + sigm(x)(1 - fx) where fx = x * sigm(x)
-(defmacro sigm [one v] `(/ ~one
-                           (+ ~one (Math/exp (- ~v)))))
-(defmacro fx [one v] `(* ~v (sigm ~one ~v)))
-(defmacro swish-deriv [one v] `(+  (fx ~one ~v)
-                                   (* (sigm ~one  ~v) (- ~one (fx ~one ~v)))))
-
-
 (defmacro act-backward-impl
   [datatype]
   `(fn [input-gradient# input-grad-dims#
@@ -1282,14 +1270,6 @@
             (v-aset src-grad# (.idx_to_address src-grad-idx# idx#)
                     (* out-val#
                        (- val-1# out-val#)
-                       (v-aget dest-grad# (.idx_to_address dest-grad-idx# idx#))))))
-         :swish
-         ;; ( f(x) + (sigma(x) * (1 - f(x)))) * output-grad
-         (parallel/parallel-for
-          idx# n-elems#
-          (let [out-val# (v-aget dest# (.idx_to_address dest-idx# idx#))]
-            (v-aset src-grad# (.idx_to_address src-grad-idx# idx#)
-                    (* (swish-deriv val-1# out-val#)
                        (v-aget dest-grad# (.idx_to_address dest-grad-idx# idx#))))))
          :relu
          (parallel/parallel-for
