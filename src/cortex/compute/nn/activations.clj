@@ -22,6 +22,28 @@
   (tensor/unary-op! output 1.0 input :logistic)
   (tensor/binary-op! output 1.0 input 1.0 output :*))
 
+(def SELU_ALPHA 1.6732632423543772848170429916717)
+(def SELU_LAMBDA 1.0507009873554804934193349852946)
+
+(defn selu
+  "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
+  [input output]
+  (let [pos (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
+    ;; x > 0
+    (tensor/binary-op! pos 1.0 input 0 0 :max)
+    (tensor/binary-op! pos 1.0 pos 1.0 SELU_LAMBDA :*)
+
+    ;; x <= 0
+    (tensor/binary-op! zero-neg 1.0 input 0 0 :min)
+    (tensor/unary-op! zero-neg 1.0 zero-neg :exp)
+    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_ALPHA :*)
+    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_ALPHA :-)
+    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_LAMBDA :*)
+
+    (tensor/binary-op! output 1.0 pos 1.0 zero-neg :+)
+    output))
+
 ;;; Backwards
 
 (defn default-gradient
@@ -55,3 +77,36 @@
     ;; mult to the output-grad
     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
     input-gradient))
+
+(defn selu-gradient
+  "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
+  [input-gradient output-gradient output]
+  (let [pos (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
+    ;; x > 0
+    (tensor/binary-op! pos 1.0 output 0 0 :max)
+    (tensor/binary-op! pos 1.0 pos 1.0 1 :min)
+    (tensor/unary-op! pos 1.0 pos :ceil)
+    (tensor/binary-op! pos 1.0 pos 1.0 SELU_LAMBDA :*)
+
+    ;; x <= 0
+    (tensor/binary-op! zero-neg 1.0 output 0 0 :min)
+    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 -1.0 :*)
+    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 1 :min)
+    (tensor/unary-op! zero-neg 1.0 zero-neg :ceil)
+
+    (tensor/binary-op! input-gradient 1.0 output 0 0 :min)
+    (tensor/unary-op! input-gradient 1.0 input-gradient :exp)
+    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 SELU_ALPHA :*)
+    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 SELU_LAMBDA :*)
+
+    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 zero-neg :*) ;; to zero out the ones that should be
+
+    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 pos :+)
+
+    ;; mult to the output-grad
+    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
+    input-gradient)
+  
+
+  )
