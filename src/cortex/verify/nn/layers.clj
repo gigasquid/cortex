@@ -243,6 +243,16 @@
   (defn fx [v] (* v (sigmoid v)))
   (defn dswish [v] (+  (fx v) (* (sigmoid v) (- 1 (fx v)))))
 
+  (def SELU_ALPHA 1.6732632423543772848170429916717)
+  (def SELU_LAMBDA 1.0507009873554804934193349852946)
+  (defn selu [x] (if (pos? x)
+                   (* SELU_LAMBDA x)
+                   (* SELU_LAMBDA (- (* SELU_ALPHA (Math/exp x)) SELU_ALPHA))))
+
+  (defn dselu [x] (if (pos? x)
+                    SELU_LAMBDA
+                    (* SELU_LAMBDA SELU_ALPHA (Math/exp x))))
+
   (def input  [-1 1 -1 1 -1 1 -1 1 -1 1])
   (def forward-logistic (mapv sigmoid input))
   (def backward-logistic (->> forward-logistic
@@ -250,8 +260,17 @@
                               (map * input)))
   (def forward-swish (mapv swish input))
   (def backward-swish (->> forward-swish
-                              (map dswish)
-                              (map * input)))
+                           (map dswish)
+                           (map * input)))
+
+  (def forward-selu (mapv selu input))
+  (def backward-selu (->> forward-selu
+                          (map dselu)
+                          (mapv * input)))
+  backward-selu
+
+
+
 
   (def batch-input [-5 -4 -3 -2 -1 0 1 2 3 4])
   (def forward-logistic-batch (mapv sigmoid batch-input))
@@ -283,7 +302,11 @@
            -0.7615941559557649 0.7615941559557649]
           [-0.41997434161402614 0.41997434161402614 -0.41997434161402614 0.41997434161402614
            -0.41997434161402614 0.41997434161402614 -0.41997434161402614 0.41997434161402614
-           -0.41997434161402614 0.41997434161402614]]})
+           -0.41997434161402614 0.41997434161402614]]
+   :selu [[-1.1113541067739783 1.0507 -1.1113541067739783 1.0507 -1.1113541067739783 
+           1.0507 -1.1113541067739783 1.0507 -1.1113541067739783 1.0507]
+          [-0.5786255242852373 1.0507 -0.5786255242852373 1.0507 -0.5786255242852373 
+           1.0507 -0.5786255242852373 1.0507 -0.5786255242852373 1.0507]]})
 
 (defn test-activation
   [context act-type]
