@@ -4,6 +4,22 @@
             [cortex.tensor :as tensor]
             [think.datatype.core :as dtype]))
 
+(defn- greater-than-zero!
+  "Returns a tensor with 1 if it is greater than zero else 0"
+  [output-ten input-ten]
+     ;; x > 0
+    (tensor/binary-op! output-ten 1.0 input-ten 0 0 :max)
+    (tensor/binary-op! output-ten 1.0 output-ten 1.0 1 :min)
+    (tensor/unary-op! output-ten 1.0 output-ten :ceil))
+
+(defn- less-than-or-equal-zero! [output-ten input-ten]
+  "returns a tensor with a 1 if less than or equal to zero else 0"
+    ;; x <= 0
+    (tensor/binary-op! output-ten 1.0 input-ten 0 0 :min)
+    (tensor/binary-op! output-ten 1.0 output-ten 1.0 -1.0 :*)
+    (tensor/binary-op! output-ten 1.0 output-ten 1.0 1 :min)
+    (tensor/unary-op! output-ten 1.0 output-ten :ceil))
+
 
 ;;;; Forward
 
@@ -29,19 +45,26 @@
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
   (let [pos (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
-    ;; x > 0
-    (tensor/binary-op! pos 1.0 input 0 0 :max)
-    (tensor/binary-op! pos 1.0 pos 1.0 SELU_LAMBDA :*)
+        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        x1 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        x2 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
 
-    ;; x <= 0
-    (tensor/binary-op! zero-neg 1.0 input 0 0 :min)
-    (tensor/unary-op! zero-neg 1.0 zero-neg :exp)
-    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_ALPHA :*)
-    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_ALPHA :-)
-    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 SELU_LAMBDA :*)
+    (less-than-or-equal-zero! zero-neg input)
+    (greater-than-zero! pos input)
 
-    (tensor/binary-op! output 1.0 pos 1.0 zero-neg :+)
+    ;; lambda*x for x > 0
+    (tensor/binary-op! x1 1.0 input 1.0 SELU_LAMBDA :*)
+    (tensor/binary-op! x1 1.0 x1 1.0 pos :*)
+
+    ;;  lambda * ((alpha * exp(x)) - alpha) for x <=0
+    (tensor/unary-op! x2 1.0 input :exp)
+    (tensor/binary-op! x2 1.0 x2 1.0 SELU_ALPHA :*)
+    (tensor/binary-op! x2 1.0 x2 1.0 SELU_ALPHA :-)
+    (tensor/binary-op! x2 1.0 x2 1.0 SELU_LAMBDA :*)
+    (tensor/binary-op! x2 1.0 x2 1.0 zero-neg :*)
+
+    ;; add the two conditional branches together
+    (tensor/binary-op! output 1.0 x1 1.0 x2 :+)
     output))
 
 ;;; Backwards
@@ -78,35 +101,31 @@
     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
     input-gradient))
 
+
 (defn selu-gradient
   "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
   [input-gradient output-gradient output]
   (let [pos (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
-    ;; x > 0
-    (tensor/binary-op! pos 1.0 output 0 0 :max)
-    (tensor/binary-op! pos 1.0 pos 1.0 1 :min)
-    (tensor/unary-op! pos 1.0 pos :ceil)
-    (tensor/binary-op! pos 1.0 pos 1.0 SELU_LAMBDA :*)
+        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        x1 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
+        x2 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
 
-    ;; x <= 0
-    (tensor/binary-op! zero-neg 1.0 output 0 0 :min)
-    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 -1.0 :*)
-    (tensor/binary-op! zero-neg 1.0 zero-neg 1.0 1 :min)
-    (tensor/unary-op! zero-neg 1.0 zero-neg :ceil)
+    (less-than-or-equal-zero! zero-neg output)
+    (greater-than-zero! pos output)
 
-    (tensor/binary-op! input-gradient 1.0 output 0 0 :min)
-    (tensor/unary-op! input-gradient 1.0 input-gradient :exp)
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 SELU_ALPHA :*)
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 SELU_LAMBDA :*)
+    ;; lambda for x > 0
+    (tensor/binary-op! x1 1.0 x1 1.0 SELU_LAMBDA :+)
+    (tensor/binary-op! x1 1.0 x1 1.0 pos :*)
 
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 zero-neg :*) ;; to zero out the ones that should be
+     ;; lambda * alpha exp(x)  lambda * alpha exp(x)
+    (tensor/unary-op! x2 1.0 output :exp)
+    (tensor/binary-op! x2 1.0 x2 1.0 SELU_ALPHA :*)
+    (tensor/binary-op! x2 1.0 x2 1.0 SELU_LAMBDA :*)
+    (tensor/binary-op! x2 1.0 x2 1.0 zero-neg :*)
 
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 pos :+)
+    ;; add the two conditional branches together
+    (tensor/binary-op! input-gradient 1.0 x1 1.0 x2 :+)
 
     ;; mult to the output-grad
     (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
-    input-gradient)
-  
-
-  )
+    input-gradient))
