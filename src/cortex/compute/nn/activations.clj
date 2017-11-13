@@ -5,19 +5,19 @@
             [cortex.tensor.operations :as tops]
             [think.datatype.core :as dtype]))
 
-;;; Used for activations like SELU with if branches
+;;; Used for SELU with if branches
 (defn- greater-than-zero!
   "Returns a tensor with 1 if it is greater than zero else 0"
-  [output-ten input-ten]
+  [output input]
   ;; x > 0
-  (-> (tops/max output-ten input-ten 0)
+  (-> (tops/max output input 0)
       (tops/min 1)
       (tops/ceil)))
 
-(defn- less-than-or-equal-zero! [output-ten input-ten]
+(defn- less-than-or-equal-zero! [output input]
   "returns a tensor with a 1 if less than or equal to zero else 0"
   ;; x <= 0
-  (-> (tops/min output-ten input-ten 0)
+  (-> (tops/min output input 0)
       (tops/* -1.0)
       (tops/min 1)
       (tops/ceil)))
@@ -45,15 +45,11 @@
 (defn selu
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
-  (let [pos (tops/new-tensor output)
-        zero-neg (tops/new-tensor output)
-        x1 (tops/new-tensor output)
-        x2 (tops/new-tensor output)
-        pos (greater-than-zero! pos input)
-        zero-neg (less-than-or-equal-zero! zero-neg input)
-        x1 (-> (tops/* x1 input SELU_LAMBDA)
+  (let [pos (greater-than-zero! (tops/new-tensor output) input)
+        zero-neg (less-than-or-equal-zero! (tops/new-tensor output) input)
+        x1 (-> (tops/* (tops/new-tensor output) input SELU_LAMBDA)
                (tops/* pos))
-        x2 (-> (tops/exp x2 input)
+        x2 (-> (tops/exp (tops/new-tensor output) input)
                (tops/* SELU_ALPHA)
                (tops/- SELU_ALPHA)
                (tops/* SELU_LAMBDA)
@@ -81,46 +77,32 @@
 (defn swish-gradient
   "(fx + sigm *(1 -fx)) * output-grad - where fx = sigm(x) * x"
   [input-gradient output-gradient output]
-  (let [fx (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        sigm (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
-    ;;fx
-    (tensor/unary-op! fx 1.0 output :logistic)
-    (tensor/binary-op! fx 1.0 fx 1.0 output :*)
-    ;; sigm
-    (tensor/unary-op! sigm 1.0 output :logistic)
-    ;; (fx + sigm*(1-fx)
-    (tensor/binary-op! input-gradient 1.0 1.0 1.0 fx :-)
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 sigm :*)
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 fx :+)
-    ;; mult to the output-grad
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
-    input-gradient))
+  (let [fx (-> (tops/logistic (tops/new-tensor output) output)
+               (tops/* output))
+        sigm (tops/logistic (tops/new-tensor output) output)]
 
+    ;; (fx + sigm*(1-fx)
+    (-> (tops/- input-gradient 1.0 fx)
+        (tops/* sigm)
+        (tops/+ fx)
+        ;; mult to the output-grad
+        (tops/* output-gradient))))
 
 (defn selu-gradient
   "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
   [input-gradient output-gradient output]
-  (let [pos (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        zero-neg (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        x1 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))
-        x2 (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output))]
-
-    (less-than-or-equal-zero! zero-neg output)
-    (greater-than-zero! pos output)
-
-    ;; lambda for x > 0
-    (tensor/binary-op! x1 1.0 x1 1.0 SELU_LAMBDA :+)
-    (tensor/binary-op! x1 1.0 x1 1.0 pos :*)
-
-     ;; lambda * alpha exp(x)  lambda * alpha exp(x)
-    (tensor/unary-op! x2 1.0 output :exp)
-    (tensor/binary-op! x2 1.0 x2 1.0 SELU_ALPHA :*)
-    (tensor/binary-op! x2 1.0 x2 1.0 SELU_LAMBDA :*)
-    (tensor/binary-op! x2 1.0 x2 1.0 zero-neg :*)
+  (let [pos (greater-than-zero! (tops/new-tensor output) output)
+        zero-neg (less-than-or-equal-zero! (tops/new-tensor output) output)
+        ;; lambda for x > 0
+        x1 (-> (tops/+ (tops/new-tensor output) SELU_LAMBDA)
+               (tops/* pos))
+        ;; lambda * alpha exp(x) for x <=0
+        x2 (-> (tops/exp (tops/new-tensor output) output)
+               (tops/* SELU_ALPHA)
+               (tops/* SELU_LAMBDA)
+               (tops/* zero-neg))]
 
     ;; add the two conditional branches together
-    (tensor/binary-op! input-gradient 1.0 x1 1.0 x2 :+)
-
-    ;; mult to the output-grad
-    (tensor/binary-op! input-gradient 1.0 input-gradient 1.0 output-gradient :*)
-    input-gradient))
+    (-> (tops/+ input-gradient x1 x2)
+        ;; mult to the output-grad
+        (tops/* output-gradient))))
