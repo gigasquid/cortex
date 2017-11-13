@@ -14,8 +14,8 @@
       (tops/min 1)
       (tops/ceil)))
 
-(defn- less-than-or-equal-zero! [output input]
-  "returns a tensor with a 1 if less than or equal to zero else 0"
+(defn- less-than-zero! [output input]
+  "returns a tensor with a 1 if less than zero else 0"
   ;; x <= 0
   (-> (tops/min output input 0)
       (tops/* -1.0)
@@ -46,7 +46,7 @@
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
   (let [pos (greater-than-zero! (tops/new-tensor output) input)
-        zero-neg (less-than-or-equal-zero! (tops/new-tensor output) input)
+        zero-neg (less-than-zero! (tops/new-tensor output) input)
         x1 (-> (tops/* (tops/new-tensor output) input SELU_LAMBDA)
                (tops/* pos))
         x2 (-> (tops/exp (tops/new-tensor output) input)
@@ -92,7 +92,7 @@
   "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
   [input-gradient output-gradient output]
   (let [pos (greater-than-zero! (tops/new-tensor output) output)
-        zero-neg (less-than-or-equal-zero! (tops/new-tensor output) output)
+        zero-neg (less-than-zero! (tops/new-tensor output) output)
         ;; lambda for x > 0
         x1 (-> (tops/+ (tops/new-tensor output) SELU_LAMBDA)
                (tops/* pos))

@@ -73,4 +73,3 @@
   "Returns a new tensor of the same shape and type of the given output tensor"
   [output]
   (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output)))
-
