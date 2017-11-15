@@ -45,11 +45,11 @@
 (defn selu
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
-  (let [pos (greater-than-zero! (tops/new-tensor output) input)
-        zero-neg (less-than-zero! (tops/new-tensor output) input)
-        x1 (-> (tops/* (tops/new-tensor output) input SELU_LAMBDA)
+  (let [pos (tops/> (tops/new-tensor input) input 0)
+        zero-neg (tops/bit-xor (tops/new-tensor pos) pos 1)
+        x1 (-> (tops/* (tops/new-tensor input) input SELU_LAMBDA)
                (tops/* pos))
-        x2 (-> (tops/exp (tops/new-tensor output) input)
+        x2 (-> (tops/exp (tops/new-tensor input) input)
                (tops/* SELU_ALPHA)
                (tops/- SELU_ALPHA)
                (tops/* SELU_LAMBDA)
@@ -57,6 +57,19 @@
 
       ;; add the two conditional branches together
     (tops/+ output x1 x2)))
+
+(defn selu
+  "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
+  [input output]
+  (tops/if output
+           (tops/> (tops/new-tensor input) input 0)
+           ; lambda*x for x > 0
+            (tops/* (tops/new-tensor input) input SELU_LAMBDA)
+           ;  lambda * ((alpha * exp(x)) - alpha) for x <=0
+            (-> (tops/exp (tops/new-tensor input) input)
+                (tops/* SELU_ALPHA)
+                (tops/- SELU_ALPHA)
+                (tops/* SELU_LAMBDA))))
 
 ;;; Backwards
 
@@ -91,18 +104,12 @@
 (defn selu-gradient
   "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
   [input-gradient output-gradient output]
-  (let [pos (greater-than-zero! (tops/new-tensor output) output)
-        zero-neg (less-than-zero! (tops/new-tensor output) output)
-        ;; lambda for x > 0
-        x1 (-> (tops/+ (tops/new-tensor output) SELU_LAMBDA)
-               (tops/* pos))
-        ;; lambda * alpha exp(x) for x <=0
-        x2 (-> (tops/exp (tops/new-tensor output) output)
-               (tops/* SELU_ALPHA)
-               (tops/* SELU_LAMBDA)
-               (tops/* zero-neg))]
-
-    ;; add the two conditional branches together
-    (-> (tops/+ input-gradient x1 x2)
-        ;; mult to the output-grad
-        (tops/* output-gradient))))
+  (-> (tops/if input-gradient
+              (tops/> (tops/new-tensor output) output 0)
+              ;; "lambda for x > 0
+              (tops/+ (tops/new-tensor output) SELU_LAMBDA)
+              ; "lambda for x > 0
+              (-> (tops/exp (tops/new-tensor output) output)
+                  (tops/* SELU_ALPHA)
+                  (tops/* SELU_LAMBDA)))
+      (tops/* output-gradient)))

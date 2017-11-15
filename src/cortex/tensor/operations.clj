@@ -1,6 +1,6 @@
 (ns cortex.tensor.operations
   "tensor operations with syntatic sugar"
-  (:refer-clojure :exclude [max min * - +])
+  (:refer-clojure :exclude [max min * - + > >= < <= bit-and bit-or bit-xor if])
   (:require [clojure.core.matrix :as m]
             [cortex.tensor :as tensor]
             [think.datatype.core :as dtype]))
@@ -47,7 +47,6 @@
   ([output input]
    (tensor/unary-op! output 1.0 input :exp)))
 
-
 (defn *
   "Takes and x1 and x2 multiples them together and puts the result in the mutated output"
   ([output x1]
@@ -69,7 +68,60 @@
   ([output x1 x2]
    (tensor/binary-op! output 1.0 x1 1.0 x2 :+)))
 
+(defn >
+  "Takes and x1 and x2 returns 1 if x1 > x2 and 0 otherwise them and puts the result in the mutated output"
+  ([output x1]
+   (> output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :>)))
+
+(defn >=
+  "Takes and x1 and x2 returns 1 if x1 >= x2 and 0 otherwise them and puts the result in the mutated output"
+  ([output x1]
+   (>= output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :>=)))
+
+(defn <
+  "Takes and x1 and x2 returns 1 if x1 < x2 and 0 otherwise them and puts the result in the mutated output"
+  ([output x1]
+   (< output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :<)))
+
+(defn <=
+  "Takes and x1 and x2 returns 1 if x1 <= x2 and 0 otherwise them and puts the result in the mutated output"
+  ([output x1]
+   (<= output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :<=)))
+
+(defn bit-xor
+  "Takes and x1 and x2 returns xor x1 and x2 them and puts the result in the mutated output"
+  ([output x1]
+   (bit-xor output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :bit-xor)))
+
+(defn bit-and
+  "Takes and x1 and x2 returns bit and of x1 and x2 and them and puts the result in the mutated output"
+  ([output x1]
+   (bit-and output output x1))
+  ([output x1 x2]
+   (tensor/binary-op! output 1.0 x1 1.0 x2 :bit-and)))
+
 (defn new-tensor
   "Returns a new tensor of the same shape and type of the given output tensor"
   [output]
   (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output)))
+
+(defn if
+  "Takes a tests tensor of 1s and 0s and a tensor of then and a tensor of else. It will multiply the test and the complement of the test
+  to the then and else and then add the result to the output"
+  [output test then else]
+  (let [compl (bit-xor (new-tensor test) test 1)
+        x1 (* then test)
+        x2 (* else compl)]
+
+      ;; add the two conditional branches together
+    (+ output x1 x2)))
