@@ -45,22 +45,6 @@
 (defn selu
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
-  (let [pos (tops/> (tops/new-tensor input) input 0)
-        zero-neg (tops/bit-xor (tops/new-tensor pos) pos 1)
-        x1 (-> (tops/* (tops/new-tensor input) input SELU_LAMBDA)
-               (tops/* pos))
-        x2 (-> (tops/exp (tops/new-tensor input) input)
-               (tops/* SELU_ALPHA)
-               (tops/- SELU_ALPHA)
-               (tops/* SELU_LAMBDA)
-               (tops/* zero-neg))]
-
-      ;; add the two conditional branches together
-    (tops/+ output x1 x2)))
-
-(defn selu
-  "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
-  [input output]
   (tops/if output
            (tops/> (tops/new-tensor input) input 0)
            ; lambda*x for x > 0
