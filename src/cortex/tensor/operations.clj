@@ -1,6 +1,6 @@
 (ns cortex.tensor.operations
   "tensor operations with syntatic sugar"
-  (:refer-clojure :exclude [max min * - + > >= < <= bit-and bit-or bit-xor if])
+  (:refer-clojure :exclude [max min * - + > >= < <= bit-and bit-xor])
   (:require [clojure.core.matrix :as m]
             [cortex.tensor :as tensor]
             [think.datatype.core :as dtype]))
@@ -115,7 +115,7 @@
   [output]
   (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output)))
 
-(defn if
+(defn if-tensor
   "Takes a tests tensor of 1s and 0s and a tensor of then and a tensor of else. It will multiply the test and the complement of the test
   to the then and else and then add the result to the output"
   [output test then else]
