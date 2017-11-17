@@ -1,4 +1,4 @@
-(ns cortex.compute.cpu.tensor-operations-test
+(ns ^:gpu cortex.compute.cuda.tensor-operations-test
   (:require [cortex.verify.tensor.operations :as verify-tensor-operations]
             [cortex.compute.verify.utils
              :refer [def-double-float-test
@@ -68,4 +68,3 @@
 
 (def-all-dtype-test new-tensor-operation
   (verify-tensor-operations/new-tensor-operation (driver) *datatype*))
-
