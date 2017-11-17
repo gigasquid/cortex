@@ -1,10 +1,8 @@
 (ns cortex.compute.nn.activations
   "High level implemenations of activations that work across all backends"
   (:refer-clojure :exclude [ * - + >])
-  (:require [clojure.core.matrix :as m]
-            [cortex.tensor :as tensor]
-            [cortex.tensor.operations :as tops :refer [* - + > new-tensor exp if-tensor]]
-            [think.datatype.core :as dtype]))
+  (:require [cortex.tensor :as tensor]
+            [cortex.tensor.operations :as tops :refer [* - + > new-tensor exp where]]))
 
 ;;;; Forward
 
@@ -29,15 +27,15 @@
 (defn selu
   "lambda*x for x > 0 and lambda * ((alpha * exp(x)) - alpha) for x <=0"
   [input output]
-  (if-tensor output
-           (> (new-tensor input) input 0)
-           ; lambda*x for x > 0
-            (* (new-tensor input) input SELU_LAMBDA)
-           ;  lambda * ((alpha * exp(x)) - alpha) for x <=0
-            (-> (exp (new-tensor input) input)
-                (* SELU_ALPHA)
-                (- SELU_ALPHA)
-                (* SELU_LAMBDA))))
+  (where output
+         (> (new-tensor input) input 0)
+         ; lambda*x for x > 0
+         (* (new-tensor input) input SELU_LAMBDA)
+         ;  lambda * ((alpha * exp(x)) - alpha) for x <=0
+         (-> (exp (new-tensor input) input)
+             (* SELU_ALPHA)
+             (- SELU_ALPHA)
+             (* SELU_LAMBDA))))
 
 ;;; Backwards
 
@@ -72,7 +70,7 @@
 (defn selu-gradient
   "lambda for x > 0 and lambda * alpha exp(x) for x <= 0"
   [input-gradient output-gradient output]
-  (-> (if-tensor input-gradient
+  (-> (where input-gradient
               (> (new-tensor output) output 0)
               ;; "lambda for x > 0
               (+ (new-tensor output) SELU_LAMBDA)

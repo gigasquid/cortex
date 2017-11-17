@@ -26,6 +26,13 @@
   ([output input]
    (tensor/unary-op! output 1.0 input :ceil)))
 
+(defn floor
+  "Takes an tensor returns the mutated tensor with the value with the floor function applied"
+  ([output]
+   (floor output output))
+  ([output input]
+   (tensor/unary-op! output 1.0 input :floor)))
+
 (defn logistic
   "Takes an tensor returns the mutated tensor with the value with the logistic function applied"
   ([output]
@@ -115,9 +122,12 @@
   [output]
   (tensor/new-tensor (m/shape output) :datatype (dtype/get-datatype output)))
 
-(defn if-tensor
-  "Takes a tests tensor of 1s and 0s and a tensor of then and a tensor of else. It will multiply the test and the complement of the test
-  to the then and else and then add the result to the output"
+(defn where
+  "Takes a tests tensor of 1s and 0s and a tensor of then and a tensor of else.
+  It will multiply the test and the complement of the test
+  to the then and else and then add the result to the output.
+  The condition tensor acts as a mask that chooses, based on the value at each element,
+  whether the corresponding element / row in the output should be taken from x1 (if true) or x2 (if false)."
   [output test then else]
   (let [compl (bit-xor (new-tensor test) test 1)
         x1 (* then test)
