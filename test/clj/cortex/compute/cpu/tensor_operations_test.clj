@@ -63,3 +63,9 @@
 (def-all-dtype-test bit-xor-operation
   (verify-tensor-operations/bit-xor-operation (driver) *datatype*))
 
+(def-all-dtype-test where-operation
+  (verify-tensor-operations/where-operation (driver) *datatype*))
+
+(def-all-dtype-test new-tensor-operation
+  (verify-tensor-operations/new-tensor-operation (driver) *datatype*))
+

@@ -3,8 +3,8 @@
             [clojure.test :refer :all]
             [cortex.compute.driver :as drv]
             [cortex.tensor :as ct]
-            [cortex.tensor.operations :as tops]))
-
+            [cortex.tensor.operations :as tops]
+            [think.datatype.core :as dtype]))
 
 (defmacro tensor-context
   [driver datatype & body]
@@ -13,13 +13,6 @@
      (with-bindings {#'ct/*stream* (drv/create-stream)
                      #'ct/*datatype* ~datatype}
        ~@body)))
-
-
-(comment
-       (println "carin " (map str (ct/to-double-array result2)))
-)
-
-
 
 (defn unary-operation [driver datatype op-fn arg src-data compare-result]
   (tensor-context
@@ -214,3 +207,24 @@
                     [1 0 0 1]
                     [1 1 1 1]
                     [0 1 1 0]))
+
+(defn where-operation [driver datatype]
+  (tensor-context
+   driver datatype
+   (let [test-ten (ct/->tensor [1 0 0 1 0])
+         then-ten (ct/->tensor [1 2 3 4 5])
+         else-ten (ct/->tensor [6 7 8 9 10])
+         output-ten (tops/new-tensor else-ten)
+         result (tops/where output-ten test-ten then-ten else-ten)]
+     (is (m/equals [1.0 7.0 8.0 4.0 10.0]
+                   (ct/to-double-array result))))))
+
+(defn new-tensor-operation [driver datatype]
+  (tensor-context
+   driver datatype
+   (let [test-ten (ct/->tensor [1 0 0 1 0])
+         new-ten (tops/new-tensor test-ten)]
+     (is (= (m/shape test-ten) (m/shape new-ten)))
+     (is (= (dtype/get-datatype test-ten) (dtype/get-datatype new-ten)))
+     (is (m/equals [0.0 0.0 0.0 0.0 0.0]
+                   (ct/to-double-array new-ten))))))
