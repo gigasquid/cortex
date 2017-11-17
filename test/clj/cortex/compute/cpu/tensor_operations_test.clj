@@ -23,3 +23,27 @@
 
 (def-all-dtype-test floor-operation
   (verify-tensor-operations/floor-operation (driver) *datatype*))
+
+(def-double-float-test logistic-operation
+  (verify-tensor-operations/logistic-operation (driver) *datatype*))
+
+(def-double-float-test tanh-operation
+  (verify-tensor-operations/tanh-operation (driver) *datatype*))
+
+(def-double-float-test max-operation
+  (verify-tensor-operations/max-operation (driver) *datatype*))
+
+(def-all-dtype-test exp-operation
+  (verify-tensor-operations/exp-operation (driver) *datatype*))
+
+(def-all-dtype-test multiply-operation
+  (verify-tensor-operations/multiply-operation (driver) *datatype*))
+
+(def-all-dtype-test add-operation
+  (verify-tensor-operations/multiply-operation (driver) *datatype*))
+
+(def-all-dtype-test subtract-operation
+  (verify-tensor-operations/subtract-operation (driver) *datatype*))
+
+(def-all-dtype-test >-operation
+  (verify-tensor-operations/>-operation (driver) *datatype*))
