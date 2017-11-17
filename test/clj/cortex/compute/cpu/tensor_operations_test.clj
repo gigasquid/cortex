@@ -47,3 +47,19 @@
 
 (def-all-dtype-test >-operation
   (verify-tensor-operations/>-operation (driver) *datatype*))
+
+(def-all-dtype-test >=-operation
+  (verify-tensor-operations/>-operation (driver) *datatype*))
+
+(def-all-dtype-test <-operation
+  (verify-tensor-operations/>-operation (driver) *datatype*))
+
+(def-all-dtype-test <=-operation
+  (verify-tensor-operations/>-operation (driver) *datatype*))
+
+(def-all-dtype-test bit-and-operation
+  (verify-tensor-operations/bit-and-operation (driver) *datatype*))
+
+(def-all-dtype-test bit-xor-operation
+  (verify-tensor-operations/bit-xor-operation (driver) *datatype*))
+

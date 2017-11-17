@@ -19,120 +19,99 @@
        (println "carin " (map str (ct/to-double-array result2)))
 )
 
-(defn max-operation
-  [driver datatype]
+
+
+(defn unary-operation [driver datatype op-fn arg src-data compare-result]
   (tensor-context
    driver datatype
-   (let [tens-a (ct/->tensor [0 1 2 3 4])
+   (let [tens-a (ct/->tensor src-data)
          tens-b (tops/new-tensor tens-a)
-         result (tops/max tens-b tens-a 2)]
-     (is (m/equals [2 2 2 3 4]
+         result (if arg
+                  (op-fn tens-b tens-a arg)
+                  (op-fn tens-b tens-a))]
+     (is (m/equals compare-result
                    (ct/to-double-array
-                    result)))
-     (let [result2 (tops/max result 3)]
-       (is (m/equals [3 3 3 3 4]
+                    result)
+                   1e-4))
+     (let [result2 (if arg
+                     (op-fn tens-a arg)
+                     (op-fn tens-a))]
+       (is (m/equals compare-result
                      (ct/to-double-array
-                      result2)))))))
+                      result)
+                     1e-4))))))
+
+(defn max-operation
+  [driver datatype]
+  (unary-operation driver
+                   datatype
+                   tops/max
+                   2
+                   [0 1 2 3 4]
+                   [2 2 2 3 4]))
 
 (defn min-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [tens-a (ct/->tensor [0 1 2 3 4])
-         tens-b (tops/new-tensor tens-a)
-         result (tops/min tens-b tens-a 2)]
-     (is (m/equals [0 1 2 2 2]
-                   (ct/to-double-array
-                    result)))
-     (let [result2 (tops/min result 1)]
-       (is (m/equals [0 1 1 1 1]
-                     (ct/to-double-array
-                      result2)))))))
+  (unary-operation driver
+                   datatype
+                   tops/min
+                   2
+                   [0 1 2 3 4]
+                   [0 1 2 2 2]))
 
 (defn ceil-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [tens-a (ct/->tensor (partition 3 (range 9)))
-         tens-b (ct/->tensor (partition 3 (repeat 9 1)))
-         result (tops/ceil tens-b (tops/* tens-a 2.5))]
-     (is (m/equals (mapv #(Math/ceil (* ^double % (drv/dtype-cast 2.5 datatype))) (range 9))
-                   (ct/to-double-array result)))
-     (let [tens-c (ct/->tensor (partition 3 (range 9)))
-           result2 (tops/ceil (tops/* tens-c 2.5))]
-       (is (m/equals (mapv #(Math/ceil (* ^double % (drv/dtype-cast 2.5 datatype))) (range 9))
-                     (ct/to-double-array result2)))))))
+  (let [data [0.5 1.5 2.5 3.5]]
+    (unary-operation driver
+                     datatype
+                     tops/ceil
+                     nil
+                     data
+                     (mapv #(Math/ceil (drv/dtype-cast % datatype)) data))))
 
 (defn floor-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [tens-a (ct/->tensor (partition 3 (range 9)))
-         tens-b (ct/->tensor (partition 3 (repeat 9 1)))
-         result (tops/floor tens-b (tops/* tens-a 2.5))]
-     (is (m/equals (mapv #(Math/floor (* ^double % (drv/dtype-cast 2.5 datatype))) (range 9))
-                   (ct/to-double-array result)))
-     (let [tens-c (ct/->tensor (partition 3 (range 9)))
-           result2 (tops/floor (tops/* tens-c 2.5))]
-       (is (m/equals (mapv #(Math/floor (* ^double % (drv/dtype-cast 2.5 datatype))) (range 9))
-                     (ct/to-double-array result2)))))))
+  (let [data [0.5 1.5 2.5 3.5]]
+    (unary-operation driver
+                     datatype
+                     tops/floor
+                     nil
+                     data
+                     (mapv #(Math/floor (drv/dtype-cast % datatype)) data))))
 
 (defn logistic-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [tens-a (ct/->tensor (range -4 8))
-         tens-b (tops/new-tensor tens-a)
-         result (tops/logistic tens-b tens-a)
-         logistic-result [0.01798620996209156, 0.04742587317756678, 0.11920292202211755,
-                          0.2689414213699951, 0.5, 0.7310585786300049, 0.8807970779778823,
-                          0.9525741268224334, 0.9820137900379085, 0.9933071490757153,
-                          0.9975273768433653, 0.9990889488055994]]
-     (is (m/equals logistic-result
-                   (ct/to-double-array result)
-                   1e-4))
-     (let [result2 (tops/logistic tens-a)]
-       (is (m/equals logistic-result
-                     (ct/to-double-array
-                      result2)
-                     1e-4))))))
+  (unary-operation driver
+                   datatype
+                   tops/logistic
+                   nil
+                   (range -4 8)
+                   [0.01798620996209156, 0.04742587317756678, 0.11920292202211755,
+                    0.2689414213699951, 0.5, 0.7310585786300049, 0.8807970779778823,
+                    0.9525741268224334, 0.9820137900379085, 0.9933071490757153,
+                    0.9975273768433653, 0.9990889488055994]))
 
 (defn tanh-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [tens-a (ct/->tensor (range -4 8))
-         tens-b (tops/new-tensor tens-a)
-         result (tops/tanh tens-b tens-a)
-         tanh-result [-0.999329299739067, -0.9950547536867305, -0.9640275800758169,
-                      -0.7615941559557649, 0.0, 0.7615941559557649, 0.9640275800758169,
-                      0.9950547536867305, 0.999329299739067, 0.9999092042625951,
-                      0.9999877116507956, 0.9999983369439447]]
-     (is (m/equals tanh-result
-                   (ct/to-double-array result)
-                   1e-4))
-     (let [result2 (tops/tanh tens-a)]
-       (is (m/equals tanh-result
-                     (ct/to-double-array
-                      result2)
-                     1e-4))))))
+  (unary-operation driver
+                   datatype
+                   tops/tanh
+                   nil
+                   (range -4 8)
+                   [-0.999329299739067, -0.9950547536867305, -0.9640275800758169,
+                    -0.7615941559557649, 0.0, 0.7615941559557649, 0.9640275800758169,
+                    0.9950547536867305, 0.999329299739067, 0.9999092042625951,
+                    0.9999877116507956, 0.9999983369439447]))
 
 (defn exp-operation
   [driver datatype]
-  (tensor-context
-   driver datatype
-   (let [src-data [0 1 2 3 4]
-         tens-a (ct/->tensor src-data)
-         tens-b (tops/new-tensor tens-a)
-         result (tops/exp tens-b tens-a)
-         exp-result (mapv #(drv/dtype-cast (Math/exp (double %)) datatype) src-data)]
-     (is (m/equals exp-result
-                   (ct/to-double-array result)))
-     (let [result2 (tops/exp tens-a)]
-       (is (m/equals exp-result
-                     (ct/to-double-array
-                      result2)))))))
-
+  (let [data [0 1 2 3 4]]
+   (unary-operation driver
+                    datatype
+                    tops/exp
+                    nil
+                    data
+                    (mapv #(drv/dtype-cast (Math/exp (double %)) datatype) data))))
 
 (defn binary-operation [driver datatype op-fn src-data-a src-data-b compare-result]
   (tensor-context
@@ -187,5 +166,51 @@
                     datatype
                     tops/>
                     [-1 0 1 2 3 4]
-                    [1 1 1 1 1 1]
-                    [0 0 0 1 1 1]))
+                    [ 1 1 1 1 1 1]
+                    [ 0 0 0 1 1 1]))
+
+(defn >-operation
+  [driver datatype]
+  (binary-operation driver
+                    datatype
+                    tops/>=
+                    [-1 0 1 2 3 4]
+                    [ 1 1 1 1 1 1]
+                    [ 0 0 1 1 1 1]))
+
+
+(defn <-operation
+  [driver datatype]
+  (binary-operation driver
+                    datatype
+                    tops/>
+                    [-1 0 1 2 3 4]
+                    [ 1 1 1 1 1 1]
+                    [ 1 1 0 0 0 0]))
+
+(defn <=-operation
+  [driver datatype]
+  (binary-operation driver
+                    datatype
+                    tops/>=
+                    [-1 0 1 2 3 4]
+                    [ 1 1 1 1 1 1]
+                    [ 1 1 1 0 0 0]))
+
+(defn bit-and-operation
+  [driver datatype]
+  (binary-operation driver
+                    datatype
+                    tops/bit-and
+                    [1 0 0 1]
+                    [1 1 1 1]
+                    [1 0 0 1]))
+
+(defn bit-xor-operation
+  [driver datatype]
+  (binary-operation driver
+                    datatype
+                    tops/bit-xor
+                    [1 0 0 1]
+                    [1 1 1 1]
+                    [0 1 1 0]))
